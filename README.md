@@ -1,177 +1,88 @@
-# GitHub Profile Summarizer (React + Vite + Tailwind)
+# GitHub Profile Summarizer
 
-A clean UI that asks for a GitHub username and summarizes:
-- Profile (name, bio, followers, location)
-- Public repos (top 20 by stars)
-- Languages distribution (pie chart, aggregated across repos)
-- Recent commits (approx. via public events)
+A React web app that takes a GitHub username and produces a one-page summary of
+the person's public profile and repositories.
 
-## Quick Start
+![Profile summary](https://github.com/user-attachments/assets/56401f40-e3a8-49af-9939-6d02c7d9db0d)
+
+## What it shows
+
+- **Profile:** name, bio, followers, location.
+- **Repositories:** the top public repositories by stars.
+- **Languages:** a pie chart of languages across repositories, weighted by bytes of code.
+- **Recent activity:** an approximate commit count, taken from push events in the user's public activity feed (the last 300 events).
+
+## Tech stack
+
+- React 18, built with Vite
+- Tailwind CSS for styling
+- Recharts for the language chart
+- Axios for calls to the GitHub REST API
+- Docker (multi-stage build, served by Nginx), and a Jenkinsfile for CI
+
+## Run locally
+
 ```bash
-cp .env.example .env   # optional: set VITE_GITHUB_TOKEN to increase rate-limit
 npm install
 npm run dev
 ```
-Open http://localhost:5173
 
-## Notes
-- **Recent commits** are counted from PushEvent payloads in public events (up to last 300 events) and are an approximation.
-- **Languages** are aggregated by summing bytes from /repos/{owner}/{repo}/languages across at most VITE_MAX_REPOS repos (default 50).
-- Add a **GitHub token** in .env to avoid rate-limit (60/hr → 5000/hr).
+Then open http://localhost:5173.
 
-## Build
-```bash
-npm run build
-npm run preview
-```
-<img width="1440" height="810" alt="Screenshot 2025-11-05 at 8 30 23 PM" src="https://github.com/user-attachments/assets/56401f40-e3a8-49af-9939-6d02c7d9db0d" />
+### Optional: GitHub token
 
-## Next steps
-- Add Dockerfile + Jenkinsfile for CI/CD
-- Cache GitHub responses in localStorage to reduce API calls
-# 🧩 GitHub Profile Summarizer
-
-<img width="1440" height="819" alt="Screenshot 2025-11-05 at 8 30 35 PM" src="https://github.com/user-attachments/assets/14b61f35-d4f3-4836-8f3d-251358fc004d" />
-
-
-A modern **React + Vite + Tailwind** web app that summarizes any GitHub profile beautifully.
-
-It shows:
-
-* 👤 Profile details (name, bio, followers, location)
-* 📊 Public repositories (top 20 by stars)
-* 🧠 Programming languages distribution (pie chart)
-* 🔁 Recent commits (from GitHub activity feed)
-* ⚡ Optional: Authenticated requests with GitHub token for higher API limits
-
----
-
-## 🚀 Quick Start
-
-### 1️⃣ Clone & Setup
+Without a token, GitHub limits the app to 60 requests per hour. A token raises this to 5,000.
 
 ```bash
-git clone https://github.com/your-username/github-profile-summarizer.git
-cd github-profile-summarizer
 cp .env.example .env
-npm install
-npm run dev
+# edit .env and set VITE_GITHUB_TOKEN
 ```
 
-Then open → [http://localhost:5173](http://localhost:5173)
+**Security note:** Vite embeds any `VITE_` variable into the JavaScript that
+browsers download. A token set this way is visible to anyone who visits the site.
+Use it only for local development, with a token that has no permissions. Do not
+commit `.env` (it is listed in `.gitignore`), and do not pass a token to
+`docker build`.
 
----
-
-## 🔐 GitHub Token Setup (Avoid Rate Limits)
-
-If you see this error:
-
-```
-API rate limit exceeded for <your IP>
-```
-
-it means you’re using unauthenticated GitHub requests (limited to 60/hour).
-
-### ✅ Fix:
-
-Generate a **Personal Access Token**:
-
-1. Go to [GitHub → Settings → Developer Settings → Tokens → Fine-grained tokens](https://github.com/settings/tokens)
-2. Click **Generate new token (classic)**
-3. Give it a name (e.g. `vite-summary-app`)
-4. Select scopes:
-
-   * `read:user`
-   * `read:repo` *(optional)*
-5. Click **Generate token** and copy it (starts with `ghp_...`)
-
-Now update your `.env`:
-
-```bash
-VITE_GITHUB_TOKEN=REDACTED_TOKEN
-VITE_MAX_REPOS=50
-```
-
-Restart your app:
-
-```bash
-npm run dev
-```
-
-✅ You now get **5000 requests/hour** instead of 60/hour.
-
----
-
-## 🧰 Tech Stack
-
-* ⚛️ **React 18** (Functional Components + Hooks)
-* ⚡ **Vite 5** (super-fast dev build)
-* 🎨 **Tailwind CSS 3**
-* 📈 **Recharts** (pie chart for languages)
-* 🔗 **Axios** (GitHub REST API integration)
-
----
-
-## 🐳 Docker Support
-
-To build and run as a Docker container:
+## Run with Docker
 
 ```bash
 docker build -t github-profile-summarizer .
-docker run -d -p 8080:80 github-profile-summarizer
+docker run --rm -p 8080:80 github-profile-summarizer
 ```
 
-Visit → [http://localhost:8080](http://localhost:8080)
+Then open http://localhost:8080.
 
----
+The image serves the built app through Nginx. The Nginx config falls back to `index.html`,
+so the app's routes work when refreshed.
 
-## ⚙️ Jenkins CI/CD Pipeline
-
-The included **Jenkinsfile**:
-
-* Checks out the repo
-* Builds the app in Node container
-* Builds & pushes Docker image to DockerHub
-* Tags with `v<build_number>` and `latest`
-
-Add Jenkins credentials:
-
-* ID: `dockerhub-creds`
-* Type: Username + Password (DockerHub)
-
-Update the image name in Jenkinsfile:
+## Project layout
 
 ```
-IMAGE_NAME = "your-dockerhub-username/github-profile-summarizer"
+.
+├── src/
+│   ├── App.jsx                   # Page layout and state
+│   ├── main.jsx                  # Entry point
+│   ├── services/github.js        # GitHub API calls
+│   └── components/               # Search bar, profile card, stat cards, repo list, language chart
+├── Dockerfile                    # Multi-stage build: Node to Nginx
+├── nginx.conf                    # SPA routing and gzip
+├── Jenkinsfile                   # CI pipeline
+├── .env.example                  # Settings template (no real values)
+└── vite.config.js
 ```
 
----
+## Limitations
 
-## 📸 Demo Flow
+- The commit count is an estimate. It only covers recent public push events, not a full history.
+- Language totals come from the first `VITE_MAX_REPOS` repositories (default 50), to limit API calls.
+- The app needs a network connection to the GitHub API and has no caching yet.
 
-1. Enter any GitHub username → click “Summarize”
-2. View profile summary and stats
-3. Inspect charts, repos, and commit counts
-4. Authenticate with GitHub token for smoother experience
+## Next steps
 
----
+- Cache GitHub responses in `localStorage` to reduce API calls.
+- Add unit tests for the summary calculations.
 
-## 🧠 Future Enhancements
+## Licence
 
-* Add GitHub GraphQL API support for faster data
-* Cache API responses in `localStorage`
-* Add dark mode
-* Deploy on AWS EC2 using Nginx container
-
----
-
-## 📄 License
-
-MIT © 2025 Shubham Gour
-
----
-
-💡 *Made for YouTube tutorials — easy to explain, easy to extend!*
-
-
-- Add trending chart for commits over time
+MIT. See `LICENSE`.
